@@ -1,0 +1,44 @@
+body {
+    background-color: white;
+    font-family: 'Inter', sans-serif;
+}
+
+input.form-control {
+    border-radius: 20px 0 0 20px;
+    border: none;
+    box-shadow: none;
+}
+
+.input-group-text {
+    border-radius: 0 20px 20px 0;
+    border: none;
+}
+.card {
+    border: 2px solid #8B5E3C; /* brown border */
+    border-radius: 15px;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    background-color: #fffaf5; /* subtle warm background */
+}
+
+.card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 20px rgba(139, 94, 60, 0.2); /* soft brown shadow */
+}
+
+.card img {
+    border-radius: 15px 15px 0 0;
+    object-fit: cover;
+}
+
+.card-title {
+    color: #5C4033; /* deep brown title */
+}
+
+.btn.btn-dark {
+    background-color: #8B5E3C;
+    border: none;
+}
+
+.btn.btn-dark:hover {
+    background-color: #70432B; /* darker brown on hover */
+}
