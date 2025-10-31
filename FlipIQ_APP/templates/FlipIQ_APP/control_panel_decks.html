@@ -1,0 +1,609 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>{{ deck.title }} - Control Panel</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root {
+      --yellow:#ffd42d;
+      --yellow-dark:#f1c425;
+      --brown:#9b6400;
+      --bg:#fffdf8;
+    }
+    body {
+      background: var(--bg);
+      font-family: "Inter", sans-serif;
+      color: #222;
+      margin: 0;
+      min-height: 100vh;
+    }
+    .topbar {
+      background: var(--yellow);
+      padding: 1rem 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+    }
+    .left-group { display: flex; align-items: center; gap: .8rem; }
+    .back-link {
+      color: #111; font-weight: 600; text-decoration: none; display: flex; align-items: center; gap: .3rem;
+    }
+    .logo { font-weight: 800; font-size: 1.5rem; }
+    .deck-header {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: .8rem 2rem;
+    }
+    .deck-header h4 { font-weight: 800; margin: 0; display: flex; align-items: center; gap: .4rem; }
+    .deck-meta { color: #555; font-size: 0.9rem; }
+    .btn-yellow {
+      background: var(--yellow); border: none; border-radius: 20px;
+      padding: .4rem 1.2rem; font-weight: 600; margin-left: .5rem;
+    }
+    .btn-yellow:hover { background: var(--yellow-dark); }
+    .card-box {
+      border: 2px solid var(--brown); border-radius: 15px;
+      padding: 1rem; margin: 1rem 2rem; background: #fff;
+    }
+    .card-box strong { font-weight: 700; }
+    .choice-badge {
+      background: #eee; border-radius: 12px; padding: .2rem .8rem;
+      margin-right: .3rem; font-size: .9rem; display: inline-block;
+    }
+    .add-card-wrap { margin: 1.5rem 2rem; }
+    .btn-add-card {
+      background: var(--yellow); border: 0; border-radius: 24px;
+      padding: .4rem 1.2rem; font-weight: 800;
+    }
+    .btn-add-card:hover { background: var(--yellow-dark); }
+    .modal-confirm {
+      display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.3);
+      justify-content: center; align-items: center; z-index: 999;
+    }
+    .modal-confirm.active { display: flex; }
+    .modal-box {
+      background: #fff; padding: 2rem; border-radius: 12px;
+      max-width: 400px; text-align: center; border: 2px solid var(--brown);
+    }
+    .btn-add-choice {
+      background: var(--yellow);
+      border: 0;
+      border-radius: 12px;
+      padding: .35rem .9rem;
+      font-weight: 700;
+    }
+    .btn-add-choice:hover {
+      background: var(--yellow-dark);
+    }
+     /* ---------- INPUT STYLING (yellow like create_deck.html) ---------- */
+.choice-input,
+.front-input,
+.back-input {
+  width: 100%;
+  padding: .6rem .9rem;
+  border: 2px solid var(--yellow);
+  border-radius: 10px;
+  outline: none;
+  background: #fff;
+  box-shadow: none;
+}
+
+.choice-input:focus,
+.front-input:focus,
+.back-input:focus {
+  border-color: var(--yellow-dark);
+  box-shadow: 0 0 0 0.2rem rgba(255, 212, 45, 0.25);
+}
+
+/* ---------- ADD CHOICE BUTTON ---------- */
+.btn-add-choice,
+.add-choice-btn {
+  background: var(--yellow);
+  border: 0;
+  border-radius: 12px;
+  padding: .35rem .9rem;
+  font-weight: 700;
+  color: #000;
+}
+
+.btn-add-choice:hover,
+.add-choice-btn:hover {
+  background: var(--yellow-dark);
+}
+
+.report-section { display:none; padding:2rem; }
+.report-header { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem; }
+.report-stat {
+  background: var(--yellow);
+  border-radius: 30px;
+  padding: 0.4rem 1rem;
+  font-weight: 700;
+}
+.empty-report {
+  text-align: center;
+  color: #ccc;
+  font-size: 1.2rem;
+  margin-top: 2rem;
+}
+
+  </style>
+</head>
+<body>
+
+  <!-- ---------- TOPBAR ---------- -->
+  <div class="topbar">
+    <div class="left-group">
+      <a href="{% url 'profile' %}" class="back-link"><i class="bi bi-arrow-left"></i> Back</a>
+    </div>
+    <div class="logo">FlipIQ</div>
+  </div>
+
+  <!-- ---------- DECK HEADER ---------- -->
+  <div class="deck-header">
+    <div>
+      <h4 id="deckTitle">{{ deck.title }}
+        <button id="editTitleBtn" class="btn btn-sm" style="background:transparent;border:0;">
+          <i class="bi bi-pencil"></i>
+        </button>
+      </h4>
+      <div class="deck-meta">{{ deck.visibility|title }} • {{ deck.subject }} • <i class="bi bi-collection"></i> {{ deck.cards.count }}</div>
+    </div>
+    <div>
+      <button id="deleteDeckBtn" class="btn"><i class="bi bi-trash"></i></button>
+      <button id="reportBtn" class="btn-yellow">Report</button>
+      <button class="btn-yellow">Start</button>
+    </div>
+  </div>
+
+  <hr>
+
+  <!-- ---------- CARDS LIST ---------- -->
+  <div id="cardsSection">
+    {% for card in deck.cards.all %}
+    <div class="card-box" data-card-id="{{ card.id }}">
+      <div style="display:flex;justify-content:space-between;">
+        <div><strong>{{ forloop.counter }}</strong></div>
+        <div>
+          <button class="btn btn-sm edit-card-btn"><i class="bi bi-pencil-square"></i></button>
+          <button class="btn btn-sm delete-card-btn"><i class="bi bi-trash"></i></button>
+        </div>
+      </div>
+      <div class="mt-2 front-view"><strong>Front:</strong> {{ card.front }}</div>
+      <div class="back-view"><strong>Back:</strong> {{ card.back }}</div>
+      <div class="choices-view"><strong>Choices:</strong>
+        {% for choice in card.choices %}
+          <span class="choice-badge">{{ choice }}</span>
+        {% endfor %}
+      </div>
+    </div>
+    {% empty %}
+      <div class="text-center text-muted">No cards yet.</div>
+    {% endfor %}
+    <div class="add-card-wrap">
+      <button class="btn-add-card" id="addCardBtn"><i class="bi bi-plus-lg"></i> Add card</button>
+    </div>
+  </div>
+
+<!-- ---------- REPORT SECTION ---------- -->
+<div id="reportSection" class="report-section" style="display:none; padding:2rem;">
+    <div class="report-header d-flex justify-content-between align-items-center flex-wrap gap-3">
+    <div><strong>Average Completion Rate:</strong> <span class="report-stat">{{ avg_completion }}%</span></div>
+    <div><strong>Total Students:</strong> <span class="report-stat">{{ total_students }}</span></div>
+  </div>
+
+  {% if submissions %}
+  <table class="table mt-4">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Submission Time</th>
+        <th>Date</th>
+        <th>Score</th>
+        <th>Percentage</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in submissions %}
+      <tr>
+        <td>{{ s.user.first_name }} {{ s.user.last_name }}</td>
+        <td>{{ s.submission_time|date:"H:i" }}</td>
+        <td>{{ s.submission_time|date:"M d, Y" }}</td>
+        <td>{{ s.score }}/{{ s.total }}</td>
+        <td>{{ s.percentage }}%</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="empty-report">No submissions yet.</div>
+  {% endif %}
+
+</div>
+
+  <!-- ---------- CONFIRM DELETE MODAL ---------- -->
+  <div id="confirmModal" class="modal-confirm">
+    <div class="modal-box">
+      <h5>Delete Deck</h5>
+      <p>Are you sure you want to delete this deck? This action cannot be undone.</p>
+      <div class="d-flex justify-content-center gap-3 mt-3">
+        <button id="cancelDelete" class="btn btn-outline-secondary">Cancel</button>
+        <button id="confirmDelete" class="btn-yellow">Delete</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const deckId = "{{ deck.id }}";
+  const csrfToken = "{{ csrf_token }}";
+  const addCardBtn = document.getElementById("addCardBtn");
+  const cardsSection = document.getElementById("cardsSection");
+  const editTitleBtn = document.getElementById("editTitleBtn");
+  const deckTitleEl = document.getElementById("deckTitle");
+
+  const reportBtn = document.getElementById("reportBtn");
+const reportSection = document.getElementById("reportSection");
+
+
+// Report / Cards toggle
+reportBtn.addEventListener("click", () => {
+  const showingReport = reportSection.style.display === "block";
+  reportSection.style.display = showingReport ? "none" : "block";
+  cardsSection.style.display = showingReport ? "block" : "none";
+  reportBtn.textContent = showingReport ? "Report" : "Back";
+});
+
+
+  // ====== EDIT TITLE (auto-saves) ======
+  editTitleBtn.addEventListener("click", async () => {
+    const currentTitle = deckTitleEl.textContent.trim();
+    const newTitle = prompt("Enter new deck title:", currentTitle);
+    if (!newTitle || newTitle.trim() === "" || newTitle === currentTitle) return;
+
+    deckTitleEl.childNodes[0].textContent = newTitle.trim();
+
+    // Save deck title change to server
+    try {
+      const response = await fetch("/publish_deck/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRFToken": csrfToken,
+        },
+        body: JSON.stringify({
+          deckId: deckId,
+          deckTitle: newTitle.trim(),
+        }),
+      });
+      const data = await response.json();
+      if (!data.success) alert("Failed to save deck title.");
+    } catch (err) {
+      console.error(err);
+      alert("Error saving deck title.");
+    }
+  });
+
+  // ====== ADD CARD ======
+  addCardBtn.addEventListener("click", () => {
+    const newCard = document.createElement("div");
+    newCard.className = "card-box editing";
+    newCard.innerHTML = `
+      <div style="display:flex;justify-content:space-between;">
+        <div><strong>New</strong></div>
+        <div>
+          <button class="btn btn-sm save-card-btn"><i class="bi bi-save"></i></button>
+          <button class="btn btn-sm delete-card-btn"><i class="bi bi-trash"></i></button>
+        </div>
+      </div>
+      <div class="mt-2 front-view">
+        <strong>Front:</strong>
+        <input type="text" class="form-control mt-1 front-input" placeholder="Question">
+      </div>
+      <div class="back-view">
+        <strong>Back:</strong>
+        <input type="text" class="form-control mt-1 back-input" placeholder="Answer">
+      </div>
+      <div class="choices-view">
+        <strong>Choices:</strong>
+        <div class="mt-1 choice-area">
+          <input type="text" class="form-control mt-1 choice-input" placeholder="Choice 1">
+          <button class="btn btn-sm btn-outline-secondary mt-2 add-choice-btn">+ Add choice</button>
+        </div>
+      </div>`;
+    cardsSection.insertBefore(newCard, addCardBtn.closest(".add-card-wrap"));
+
+    attachCardEvents(newCard);
+  });
+
+  // ====== INITIALIZE EXISTING CARDS ======
+  document.querySelectorAll(".card-box").forEach(attachCardEvents);
+
+  // ====== HELPER: Attach edit/save/delete events ======
+  function attachCardEvents(card) {
+    const editBtn = card.querySelector(".edit-card-btn");
+    const saveBtn = card.querySelector(".save-card-btn");
+    const deleteBtn = card.querySelector(".delete-card-btn");
+    const addChoiceBtn = card.querySelector(".add-choice-btn");
+
+    if (editBtn) editBtn.addEventListener("click", () => enterEditMode(card));
+    if (saveBtn) saveBtn.addEventListener("click", () => saveCard(card));
+    if (deleteBtn) deleteBtn.addEventListener("click", () => deleteCard(card));
+    if (addChoiceBtn) addChoiceBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      const area = card.querySelector(".choice-area");
+      const input = document.createElement("input");
+      input.className = "form-control mt-1 choice-input";
+      input.placeholder = "Choice";
+      area.insertBefore(input, addChoiceBtn);
+    });
+  }
+
+  // ====== ENTER EDIT MODE ======
+  function enterEditMode(card) {
+    const cardId = card.dataset.cardId;
+    const frontText = card.querySelector(".front-view").textContent.replace("Front:", "").trim();
+    const backText = card.querySelector(".back-view").textContent.replace("Back:", "").trim();
+    const choices = [...card.querySelectorAll(".choice-badge")].map(c => c.textContent);
+
+    card.innerHTML = `
+      <div style="display:flex;justify-content:space-between;">
+        <div><strong>${card.querySelector("strong")?.textContent || ""}</strong></div>
+        <div>
+          <button class="btn btn-sm save-card-btn"><i class="bi bi-save"></i></button>
+          <button class="btn btn-sm delete-card-btn"><i class="bi bi-trash"></i></button>
+        </div>
+      </div>
+      <div class="mt-2 front-view">
+        <strong>Front:</strong>
+        <input type="text" class="form-control mt-1 front-input" value="${frontText}">
+      </div>
+      <div class="back-view">
+        <strong>Back:</strong>
+        <input type="text" class="form-control mt-1 back-input" value="${backText}">
+      </div>
+      <div class="choices-view">
+        <strong>Choices:</strong>
+        <div class="mt-1 choice-area">
+          ${choices.map(c => `<input type="text" class="form-control mt-1 choice-input" value="${c}">`).join("")}
+          <button class="btn btn-sm btn-outline-secondary mt-2 add-choice-btn">+ Add choice</button>
+        </div>
+      </div>`;
+    card.classList.add("editing");
+    attachCardEvents(card);
+  }
+
+  // ====== SAVE CARD ======
+  async function saveCard(card) {
+    const cardId = card.dataset.cardId;
+    const front = card.querySelector(".front-input")?.value.trim() || "";
+    const back = card.querySelector(".back-input")?.value.trim() || "";
+    const choices = [...card.querySelectorAll(".choice-input")].map(i => i.value.trim()).filter(Boolean);
+
+    try {
+      let response;
+      if (cardId) {
+        // Existing card → update
+        response = await fetch(`/update_card/${cardId}/`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-CSRFToken": csrfToken },
+          body: JSON.stringify({ front, back, choices }),
+        });
+      } else {
+        // New card → republish deck (it will create a new card)
+        const allCards = collectAllCardsFromDOM();
+        response = await fetch("/publish_deck/", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-CSRFToken": csrfToken },
+          body: JSON.stringify({
+            deckId: deckId,
+            deckTitle: deckTitleEl.textContent.trim(),
+            interval: "{{ deck.time_interval }}",
+            subject: "{{ deck.subject }}",
+            visibility: "{{ deck.visibility }}",
+            cards: allCards,
+          }),
+        });
+      }
+
+      const data = await response.json();
+      if (data.success) {
+        card.innerHTML = `
+          <div style="display:flex;justify-content:space-between;">
+            <div><strong>${card.querySelector("strong")?.textContent || ""}</strong></div>
+            <div>
+              <button class="btn btn-sm edit-card-btn"><i class="bi bi-pencil-square"></i></button>
+              <button class="btn btn-sm delete-card-btn"><i class="bi bi-trash"></i></button>
+            </div>
+          </div>
+          <div class="mt-2 front-view"><strong>Front:</strong> ${front}</div>
+          <div class="back-view"><strong>Back:</strong> ${back}</div>
+          <div class="choices-view"><strong>Choices:</strong> ${choices.map(c => `<span class='choice-badge'>${c}</span>`).join(" ")}</div>`;
+        card.classList.remove("editing");
+        attachCardEvents(card);
+      } else {
+        alert("Failed to save card.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error saving card.");
+    }
+  }
+
+  // ====== DELETE CARD ======
+  function deleteCard(card) {
+    if (!confirm("Delete this card?")) return;
+    card.remove();
+
+    // Auto save deck after deleting
+    const allCards = collectAllCardsFromDOM();
+    fetch("/publish_deck/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-CSRFToken": csrfToken },
+      body: JSON.stringify({
+        deckId: deckId,
+        deckTitle: deckTitleEl.textContent.trim(),
+        interval: "{{ deck.time_interval }}",
+        subject: "{{ deck.subject }}",
+        visibility: "{{ deck.visibility }}",
+        cards: allCards,
+      }),
+    });
+  }
+
+  // ====== Collect all cards for full deck save ======
+  function collectAllCardsFromDOM() {
+    return [...document.querySelectorAll(".card-box")].map(card => {
+      const isEditing = card.classList.contains("editing");
+      if (isEditing) {
+        return {
+          front: card.querySelector(".front-input")?.value.trim() || "",
+          back: card.querySelector(".back-input")?.value.trim() || "",
+          choices: [...card.querySelectorAll(".choice-input")].map(i => i.value.trim()).filter(Boolean),
+        };
+      } else {
+        return {
+          front: card.querySelector(".front-view")?.textContent.replace("Front:", "").trim() || "",
+          back: card.querySelector(".back-view")?.textContent.replace("Back:", "").trim() || "",
+          choices: [...card.querySelectorAll(".choice-badge")].map(c => c.textContent.trim()),
+        };
+      }
+    });
+  }
+
+  const startBtn = document.querySelector(".deck-header .btn-yellow:last-child"); // "Start" button
+let currentSessionCode = null;
+let sessionInterval = null;
+
+// Start button behavior
+startBtn.addEventListener("click", async () => {
+  if (startBtn.textContent.trim() === "Start") {
+    // 🔸 Create new session
+    const res = await fetch(`/deck/${deckId}/start_session/`, {
+      method: "POST",
+      headers: { "X-CSRFToken": csrfToken },
+    });
+    const data = await res.json();
+    if (!data.success) return alert("Failed to start session");
+
+    currentSessionCode = data.code;
+    renderSessionLobby(currentSessionCode);
+  } else {
+    // 🔴 End session
+    if (!confirm("End current session?")) return;
+    await fetch(`/deck/${deckId}/end_session/`, {
+      method: "POST",
+      headers: { "X-CSRFToken": csrfToken },
+    });
+    clearInterval(sessionInterval);
+    location.reload();
+  }
+});
+
+function renderSessionLobby(code) {
+  cardsSection.innerHTML = `
+    <div class="text-center mt-5">
+      <h2><strong>Let’s Start <span style="color:var(--brown)">Flipping!</span></strong></h2>
+      <p>Hold up! Make sure you have everything you need before you start your deck.</p>
+      <button class="btn-yellow mt-3" id="startNowBtn">Start now</button>
+      <div class="mt-4">
+        <strong>Copy Code:</strong>
+        <span id="sessionCode" style="font-size:1.3rem;font-weight:800;">${code}</span>
+        <button class="btn btn-sm btn-outline-secondary ms-2" id="copyCodeBtn"><i class="bi bi-clipboard"></i></button>
+      </div>
+    </div>
+  `;
+  startBtn.textContent = "End Session";
+
+  document.getElementById("copyCodeBtn").addEventListener("click", () => {
+    navigator.clipboard.writeText(code);
+    alert("Code copied!");
+  });
+
+  document.getElementById("startNowBtn").addEventListener("click", async () => {
+  try {
+    const res = await fetch(`/deck/${deckId}/activate_flag/`, {
+      method: "POST",
+      headers: { "X-CSRFToken": csrfToken },
+    });
+    const data = await res.json();
+
+    if (data.success) {
+      // ✅ Open the report view page
+      window.location.href = `/deck/${deckId}/report/${data.session_id}/`;
+    } else {
+      alert(data.error || "Failed to start the quiz!");
+    }
+  } catch (err) {
+    console.error(err);
+    alert("Something went wrong when starting the session.");
+  }
+});
+}
+
+function renderProgressDisplay() {
+  cardsSection.innerHTML = `
+    <div class="text-center mt-4">
+      <h4><i class="bi bi-people"></i> Participants</h4>
+      <div id="participantsList" class="mt-3"></div>
+      <div class="mt-4">
+        <strong>Copy Code:</strong>
+        <span style="font-size:1.3rem;font-weight:800;">${currentSessionCode}</span>
+      </div>
+      <button id="endSessionBtn" class="btn-yellow mt-3">End Session</button>
+    </div>
+  `;
+
+  document.getElementById("endSessionBtn").addEventListener("click", async () => {
+    await fetch(`/deck/${deckId}/end_session/`, {
+      method: "POST",
+      headers: { "X-CSRFToken": csrfToken },
+    });
+    clearInterval(sessionInterval);
+    location.reload();
+  });
+
+  // Start auto-refresh of participants every 3 seconds
+  sessionInterval = setInterval(loadParticipants, 3000);
+  loadParticipants();
+}
+
+async function loadParticipants() {
+  const res = await fetch(`/deck/${deckId}/status/`);
+  const data = await res.json();
+  const listEl = document.getElementById("participantsList");
+  if (!listEl) return;
+
+  if (!data.active) {
+    listEl.innerHTML = "<p class='text-muted'>Session ended.</p>";
+    clearInterval(sessionInterval);
+    return;
+  }
+
+  if (data.participants.length === 0) {
+    listEl.innerHTML = "<p class='text-muted'>No participants yet.</p>";
+    return;
+  }
+
+  listEl.innerHTML = data.participants.map(p => `
+    <div class="d-flex justify-content-between align-items-center border rounded p-2 mb-2" style="background:#fff8dc;">
+      <div><i class="bi bi-person"></i> ${p.name}</div>
+      <div class="flex-grow-1 mx-3">
+        <div class="progress" style="height:8px;">
+          <div class="progress-bar bg-warning" style="width:${(p.progress/p.total*100)||0}%"></div>
+        </div>
+      </div>
+      <div>${p.progress}/${p.total}</div>
+    </div>
+  `).join("");
+}
+
+
+});
+</script>
+</body>
+</html>

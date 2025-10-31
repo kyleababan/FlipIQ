@@ -1,0 +1,326 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Play - {{ deck.title }}</title>
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+
+  <style>
+    :root {
+      --yellow:#ffd42d;
+      --brown:#9b6400;
+      --bg:#fffdf8;
+    }
+
+    body {
+      background: var(--bg);
+      font-family: "Inter", sans-serif;
+      color: #222;
+      margin: 0;
+      padding: 1rem 2rem;
+    }
+
+    .topline {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+
+    .card-idx { font-weight: 700; }
+
+    .play-area {
+      max-width: 900px;
+      margin: 0 auto;
+      display: flex;
+      gap: 20px;
+      align-items: flex-start;
+      transition: opacity 0.6s ease;
+    }
+
+    /* ✅ The entire yellow card will now flip */
+    .question-card {
+      width: 100%;
+      height: 260px;
+      background: var(--yellow);
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 48px;
+      font-weight: 800;
+      position: relative;
+      perspective: 1200px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+      transform-style: preserve-3d;
+      transition: transform 0.6s ease;
+    }
+
+    .card-inner {
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+
+    .card-face {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      backface-visibility: hidden;
+      -webkit-backface-visibility: hidden;
+    }
+
+    /* Front stays as-is */
+    .card-front {
+      transform: rotateY(0deg);
+    }
+
+    /* Back starts hidden and fades in instead of flipping */
+    .card-back {
+      opacity: 0;
+      background: var(--yellow);
+      font-size: 48px;
+      font-weight: 800;
+      transform: rotateY(0deg); /* no flip for back */
+      position: absolute;
+    }
+    .back-text {
+  transform: rotateY(180deg); /* Fix mirrored text only for the inner text */
+  }
+
+    .choices {
+      margin-top: 18px;
+      display: flex;
+      gap: 14px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .choice-btn {
+      padding: .6rem 2rem;
+      border-radius: 20px;
+      border: 2px solid var(--brown);
+      background: #fff;
+      font-weight: 700;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+
+    .choice-btn:hover:not(:disabled) {
+      background: #fff7cf;
+      transform: scale(1.05);
+    }
+
+    .choice-btn.correct { background: #2ecc71; color: #fff; border-color: #2ecc71; }
+    .choice-btn.wrong { background: #e74c3c; color: #fff; border-color: #e74c3c; }
+
+    .right-panel {
+      width: 180px;
+      min-width: 160px;
+      text-align: left;
+    }
+
+    .score-box {
+      background: #fff;
+      border-radius: 10px;
+      padding: 12px;
+      border: 2px solid #eee;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    }
+
+    .timer {
+      font-size: 0.9rem;
+      color: #666;
+      margin-top: 8px;
+      text-align: right;
+    }
+
+    .fade-screen {
+      position: fixed;
+      inset: 0;
+      background: #fff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 999;
+    }
+
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <div class="topline">
+    <div class="card-idx">
+      <i class="bi bi-book"></i>
+      <span id="indexDisplay">1</span>/<span id="totalDisplay">{{ cards_count }}</span>
+    </div>
+  </div>
+
+  <div class="play-area">
+    <div style="flex:1">
+      <div class="question-card" id="questionCard">
+        <div class="card-inner">
+          <div id="frontFace" class="card-face card-front"></div>
+          <div id="backFace" class="card-face card-back"></div>
+        </div>
+      </div>
+
+      <div class="choices" id="choicesContainer"></div>
+      <div class="timer" id="timerText">Time remaining: <span id="timeLeft">--</span></div>
+    </div>
+
+    <div class="right-panel">
+      <div class="score-box">
+        <div style="font-weight:700">Score:</div>
+        <div style="font-size:24px; font-weight:800" id="scoreValue">{{ submission.score }}</div>
+        <div style="margin-top:8px; color:#666">Player: {{ request.user.first_name }} {{ request.user.last_name }}</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- final screen -->
+  <div id="completeScreen" class="fade-screen hidden">
+    <h1 style="font-size:64px">
+      <span style="color:#222">Good</span> <span style="color:var(--brown)">Job!</span>
+    </h1>
+    <p style="margin-top:20px; font-weight:500; color:#555;">Redirecting to results...</p>
+  </div>
+
+  <script>
+    const cards = JSON.parse('{{ cards_json|escapejs }}');
+    const deckId = {{ deck.id }};
+    const sessionId = {{ session.id }};
+    let score = parseInt('{{ submission.score }}') || 0;
+    let currentIdx = 0;
+    const intervalSeconds = parseInt({{ interval_seconds }}) || 10;
+    let timer = null;
+    let timeLeft = intervalSeconds;
+
+    const questionCard = document.getElementById('questionCard');
+    const frontFace = document.getElementById('frontFace');
+    const backFace = document.getElementById('backFace');
+    const choicesContainer = document.getElementById('choicesContainer');
+    const indexDisplay = document.getElementById('indexDisplay');
+    const totalDisplay = document.getElementById('totalDisplay');
+    const timeLeftEl = document.getElementById('timeLeft');
+    const scoreEl = document.getElementById('scoreValue');
+
+    totalDisplay.textContent = cards.length;
+
+    function showCard(idx) {
+      if (idx >= cards.length) return showComplete();
+
+      currentIdx = idx;
+      const c = cards[idx];
+      indexDisplay.textContent = idx + 1;
+
+      // Reset card state
+      gsap.set(questionCard, { rotationY: 0 });
+      gsap.set(backFace, { opacity: 0 });
+      frontFace.innerHTML = `<div>${c.front}</div>`;
+     backFace.innerHTML = `<div class="back-text">${c.back}</div>`;
+
+      // Build choices
+      choicesContainer.innerHTML = "";
+      (c.choices || []).forEach(choice => {
+        const btn = document.createElement('button');
+        btn.className = 'choice-btn';
+        btn.innerText = choice;
+        btn.addEventListener('click', () => chooseAnswer(c.id, choice, btn));
+        choicesContainer.appendChild(btn);
+      });
+
+      resetTimer();
+    }
+
+    function resetTimer() {
+      if (timer) clearInterval(timer);
+      timeLeft = intervalSeconds;
+      timeLeftEl.textContent = `${timeLeft}s`;
+      timer = setInterval(() => {
+        timeLeft--;
+        timeLeftEl.textContent = `${timeLeft}s`;
+        if (timeLeft <= 0) {
+          clearInterval(timer);
+          autoReveal();
+        }
+      }, 1000);
+    }
+
+    async function flipAndShowAnswer() {
+      // Flip the whole yellow card
+      await gsap.to(questionCard, { duration: 0.6, rotationY: 180, ease: "power2.inOut" });
+      // Fade in the answer text after the flip
+      gsap.to(backFace, { duration: 0.6, opacity: 1, ease: "power2.out" });
+    }
+
+    async function autoReveal() {
+      const c = cards[currentIdx];
+      Array.from(choicesContainer.querySelectorAll('button')).forEach(b => {
+        if (b.innerText.trim() === String(c.back).trim()) b.classList.add('correct');
+      });
+      await flipAndShowAnswer();
+      await submitAnswer(c.id, "");
+      setTimeout(() => showCard(currentIdx + 1), 1200);
+    }
+
+    async function chooseAnswer(cardId, choiceText, btnEl) {
+      Array.from(choicesContainer.querySelectorAll('button')).forEach(b => b.disabled = true);
+      const res = await submitAnswer(cardId, choiceText);
+      if (!res || !res.success) return alert('Error submitting answer');
+
+      await flipAndShowAnswer();
+
+      const correctText = cards[currentIdx].back;
+      Array.from(choicesContainer.querySelectorAll('button')).forEach(b => {
+        if (b.innerText.trim() === String(correctText).trim()) b.classList.add('correct');
+      });
+      if (!res.is_correct) btnEl.classList.add('wrong');
+
+      score = res.score || score;
+      scoreEl.textContent = score;
+      if (timer) clearInterval(timer);
+
+      setTimeout(() => showCard(currentIdx + 1), 1200);
+    }
+
+    async function submitAnswer(cardId, choice) {
+      try {
+        const resp = await fetch(`/deck/${deckId}/submit_answer/`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token }}'
+          },
+          body: JSON.stringify({ session_id: sessionId, card_id: cardId, choice: choice })
+        });
+        return await resp.json();
+      } catch (err) {
+        console.error(err);
+        return null;
+      }
+    }
+
+    function showComplete() {
+      document.querySelector('.play-area').style.opacity = 0;
+      const s = document.getElementById('completeScreen');
+      s.classList.remove('hidden');
+      gsap.fromTo(s, { opacity: 0 }, { duration: 0.8, opacity: 1 });
+      setTimeout(() => window.location.href = `/deck/${deckId}/result/${sessionId}/`, 3000);
+    }
+
+    gsap.from('.question-card', { duration: 0.6, y: 20, opacity: 0 });
+    showCard(0);
+  </script>
+</body>
+</html>

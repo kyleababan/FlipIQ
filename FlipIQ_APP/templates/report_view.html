@@ -1,0 +1,157 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>{{ deck.title }} - Report</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+
+  <style>
+    :root {
+      --yellow: #ffd42d;
+      --yellow-dark: #f1c425;
+      --brown: #9b6400;
+    }
+
+    body {
+      background: #fffdf8;
+      font-family: "Inter", sans-serif;
+      color: #222;
+      margin: 0;
+    }
+
+    .report-container {
+      max-width: 800px;
+      margin: 2rem auto;
+      background: #fff;
+      border: 2px solid var(--brown);
+      border-radius: 12px;
+      padding: 2rem;
+    }
+
+    .report-header {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+
+    .participant-box {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #ffedb3;
+      border-radius: 30px;
+      padding: 0.6rem 1rem;
+      margin-bottom: 0.6rem;
+    }
+
+    .progress {
+      height: 8px;
+      flex-grow: 1;
+      margin: 0 1rem;
+    }
+
+    .footer-controls {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-top: 1px solid #ccc;
+      padding-top: 1rem;
+      margin-top: 1.5rem;
+    }
+
+    .btn-yellow {
+      background: var(--yellow);
+      border: none;
+      border-radius: 20px;
+      padding: 0.4rem 1.2rem;
+      font-weight: 700;
+    }
+    .btn-yellow:hover { background: var(--yellow-dark); }
+
+    .back-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      color: #111;
+      font-weight: 600;
+      text-decoration: none;
+      margin-bottom: 1rem;
+    }
+    .back-btn:hover { text-decoration: underline; }
+  </style>
+</head>
+
+<body>
+  <div class="report-container">
+    <!-- 🔙 Back to Control Panel -->
+    <a href="{% url 'profile' %}" class="back-btn">
+  <i class="bi bi-arrow-left"></i> Back to Profile
+</a>
+
+    <div class="report-header">
+      <h3>{{ deck.title }}</h3>
+      <p><i class="bi bi-people"></i> Participants (<span id="participantCount">0</span>)</p>
+      <p>
+        <strong>Session Code:</strong>
+        <span id="sessionCode" style="font-weight:800;font-size:1.2rem;">{{ session.code }}</span>
+        <button id="copyCodeBtn" class="btn btn-sm btn-outline-secondary ms-2"><i class="bi bi-clipboard"></i></button>
+      </p>
+    </div>
+
+    <div id="participantsList">
+      <p class="text-muted text-center">Loading participants...</p>
+    </div>
+
+    <div class="footer-controls">
+      <div class="text-muted"><small>Deck created by {{ deck.owner.username }}</small></div>
+      <button id="endSessionBtn" class="btn-yellow">End Session</button>
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const deckId = "{{ deck.id }}";
+      const sessionId = "{{ session.id }}";
+      const countEl = document.getElementById("participantCount");
+      const listEl = document.getElementById("participantsList");
+      const copyBtn = document.getElementById("copyCodeBtn");
+      const codeText = document.getElementById("sessionCode");
+
+      copyBtn.addEventListener("click", () => {
+        navigator.clipboard.writeText(codeText.textContent.trim());
+        alert("Session code copied!");
+      });
+
+      async function loadParticipants() {
+        const res = await fetch(`/deck/${deckId}/status/`);
+        const data = await res.json();
+        if (!data.active) {
+          listEl.innerHTML = "<p class='text-muted text-center'>Session ended.</p>";
+          clearInterval(refresh);
+          return;
+        }
+
+        countEl.textContent = data.participants.length;
+        listEl.innerHTML = data.participants.map(p => `
+          <div class="participant-box">
+            <i class="bi bi-person"></i> ${p.name}
+            <div class="progress">
+              <div class="progress-bar bg-warning" style="width:${(p.progress / p.total * 100) || 0}%"></div>
+            </div>
+            <span>${p.progress}/${p.total}</span>
+          </div>
+        `).join("");
+      }
+
+      document.getElementById("endSessionBtn").addEventListener("click", async () => {
+        await fetch(`/deck/${deckId}/end_session/`, { method: "POST", headers: { "X-CSRFToken": "{{ csrf_token }}" } });
+        window.location.href = "{% url 'profile' %}";
+      });
+
+      const refresh = setInterval(loadParticipants, 3000);
+      loadParticipants();
+    });
+  </script>
+</body>
+</html>
